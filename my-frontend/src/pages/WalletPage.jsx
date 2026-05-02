@@ -1,14 +1,15 @@
+// pages/WalletPage.jsx
 import React, { useState, useEffect } from "react";
-import api from "../utils/api";
-import { DEV_MODE } from "../utils/api";
+import api, { DEV_MODE } from "../utils/api";
 import { useFlash } from "../App";
 
 export default function WalletPage() {
-  const { flash }   = useFlash();
-  const [balance, setBalance]   = useState(null);
-  const [tab, setTab]           = useState("deposit");
-  const [loading, setLoading]   = useState(false);
-  const [txs, setTxs]           = useState([]);
+  const { flash } = useFlash();
+
+  const [balance,   setBalance]   = useState(null);
+  const [tab,       setTab]       = useState("deposit");
+  const [loading,   setLoading]   = useState(false);
+  const [txs,       setTxs]       = useState([]);
 
   // Deposit state
   const [depPhone,  setDepPhone]  = useState("");
@@ -16,10 +17,10 @@ export default function WalletPage() {
   const [devAmount, setDevAmount] = useState("1000");
 
   // Withdraw state
-  const [wMethod, setWMethod]   = useState("mpesa");
-  const [wPhone,  setWPhone]    = useState("");
-  const [wEmail,  setWEmail]    = useState("");
-  const [wAmount, setWAmount]   = useState("500");
+  const [wMethod, setWMethod] = useState("mpesa");
+  const [wPhone,  setWPhone]  = useState("");
+  const [wEmail,  setWEmail]  = useState("");
+  const [wAmount, setWAmount] = useState("500");
 
   const loadBalance = () =>
     api.get("/wallet/balance/").then((r) => setBalance(r.data.balance)).catch(() => {});
@@ -28,15 +29,17 @@ export default function WalletPage() {
 
   useEffect(() => { loadBalance(); loadTxs(); }, []);
 
+  // ── Handlers ──────────────────────────────────────────────
   const handleMpesaDeposit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await api.post("/wallet/deposit/mpesa/", { phone: depPhone, amount: parseFloat(depAmount) });
+      const res = await api.post("/wallet/deposit/mpesa/", {
+        phone: depPhone, amount: parseFloat(depAmount),
+      });
       flash(res.data.detail, "info");
-      // Poll status
       const txId = res.data.transaction_id;
-      let tries = 0;
+      let tries  = 0;
       const poll = setInterval(async () => {
         tries++;
         try {
@@ -91,169 +94,271 @@ export default function WalletPage() {
     }
   };
 
+  // ── Helpers ───────────────────────────────────────────────
+  const txSign  = (type) => (type === "deposit" || type === "win") ? "+" : "−";
+  const txColor = (type) => (type === "deposit" || type === "win") ? "positive" : "negative";
+
+  // ── Render ────────────────────────────────────────────────
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto", padding: "20px 12px" }}>
-      {/* Balance header */}
-      <div className="card-shabiki p-4 mb-4 text-center">
-        <div style={{ color: "var(--text-muted)", fontSize: ".75rem", letterSpacing: 1, fontFamily: "var(--font-display)" }}>
-          WALLET BALANCE
-        </div>
-        <div style={{ fontSize: "2.5rem", fontFamily: "var(--font-display)", fontWeight: 900, color: "var(--green)", marginTop: 4 }}>
-          KES {balance !== null ? parseFloat(balance).toLocaleString("en-KE", { minimumFractionDigits: 2 }) : "—"}
+    <div className="container-shabiki" style={{ padding: "20px 16px", maxWidth: 960 }}>
+
+      {/* ── Balance card ── */}
+      <div className="wallet-balance-card mb-4">
+        <div className="wallet-balance-label">WALLET BALANCE</div>
+        <div className="wallet-balance-amount">
+          {balance !== null
+            ? `KES ${parseFloat(balance).toLocaleString("en-KE", { minimumFractionDigits: 2 })}`
+            : "KES —"}
         </div>
         {DEV_MODE && (
-          <div style={{ marginTop: 8 }}>
-            <span className="dev-badge">DEV MODE — No real money</span>
+          <div style={{ marginTop: 12 }}>
+            <span className="dev-badge">⚡ DEV MODE — No real money</span>
           </div>
         )}
       </div>
 
-      <div className="row g-3">
-        {/* Deposit / Withdraw tabs */}
+      <div className="row">
+
+        {/* ── Deposit / Withdraw panel ── */}
         <div className="col-12 col-md-6">
           <div className="card-shabiki p-3">
-            {/* Tab buttons */}
-            <div className="d-flex mb-3 gap-1">
+
+            {/* Tab toggle */}
+            <div className="d-flex mb-3" style={{ gap: 6 }}>
               {["deposit", "withdraw"].map((t) => (
                 <button
                   key={t}
-                  className={tab === t ? "btn btn-orange btn-sm flex-grow-1" : "btn btn-ghost btn-sm flex-grow-1"}
+                  className={`wallet-tab-btn${tab === t ? " active" : ""}`}
                   onClick={() => setTab(t)}
-                  style={{ textTransform: "capitalize", fontFamily: "var(--font-display)", fontSize: ".72rem", letterSpacing: 1 }}
                 >
-                  {t}
+                  {t === "deposit" ? "↓ Deposit" : "↑ Withdraw"}
                 </button>
               ))}
             </div>
 
-            {/* Deposit */}
+            {/* ── DEPOSIT ── */}
             {tab === "deposit" && (
               <>
+                {/* Dev bypass */}
                 {DEV_MODE && (
-                  <form onSubmit={handleDevDeposit} className="mb-4">
-                    <div className="p-3 mb-3" style={{ background: "#713f1222", border: "1px solid #713f12", borderRadius: 8 }}>
-                      <div style={{ color: "#fde68a", fontWeight: 700, fontSize: ".8rem", marginBottom: 6 }}>
-                        ⚡ Dev Instant Deposit
+                  <form onSubmit={handleDevDeposit}>
+                    <div
+                      style={{
+                        background: "rgba(245,158,11,0.07)",
+                        border: "1px solid rgba(245,158,11,0.25)",
+                        borderRadius: "var(--radius-md)",
+                        padding: "14px 16px",
+                        marginBottom: 16,
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontFamily: "var(--font-display)",
+                          fontSize: ".65rem",
+                          letterSpacing: ".1em",
+                          color: "#fde68a",
+                          marginBottom: 10,
+                        }}
+                      >
+                        ⚡ DEV INSTANT DEPOSIT
                       </div>
                       <input
-                        className="form-control-shabiki w-100 mb-2"
+                        className="form-control-shabiki w-100"
                         type="number"
                         value={devAmount}
                         onChange={(e) => setDevAmount(e.target.value)}
                         min="1"
+                        style={{ marginBottom: 10 }}
                       />
-                      <button className="btn btn-orange w-100" type="submit" disabled={loading}
-                        style={{ fontFamily: "var(--font-display)", fontSize: ".8rem" }}>
-                        {loading ? <span className="spin"><i className="bi bi-arrow-repeat" /></span> : "ADD FUNDS (DEV)"}
+                      <button
+                        className="btn btn-orange w-100"
+                        type="submit"
+                        disabled={loading}
+                      >
+                        {loading ? <span className="spin">↻</span> : "ADD FUNDS INSTANTLY"}
                       </button>
                     </div>
                     <hr className="divider" />
                   </form>
                 )}
+
+                {/* M-Pesa STK */}
                 <form onSubmit={handleMpesaDeposit}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/M-PESA_LOGO-01.svg/200px-M-PESA_LOGO-01.svg.png"
-                      alt="M-Pesa" style={{ height: 22, filter: "brightness(1.2)" }} />
-                    <span style={{ fontFamily: "var(--font-display)", fontSize: ".72rem", color: "var(--text-muted)", letterSpacing: 1 }}>
+                  <div className="d-flex align-items-center mb-3" style={{ gap: 10 }}>
+                    <img
+                      src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/M-PESA_LOGO-01.svg/200px-M-PESA_LOGO-01.svg.png"
+                      alt="M-Pesa"
+                      style={{ height: 22, filter: "brightness(1.2)" }}
+                    />
+                    <span
+                      style={{
+                        fontFamily: "var(--font-display)",
+                        fontSize: ".6rem",
+                        letterSpacing: ".12em",
+                        color: "var(--text-muted)",
+                      }}
+                    >
                       STK PUSH
                     </span>
                   </div>
+
                   <div className="mb-3">
-                    <label style={{ color: "var(--text-muted)", fontSize: ".75rem", display: "block", marginBottom: 4 }}>
-                      Safaricom Number
-                    </label>
-                    <input className="form-control-shabiki w-100" value={depPhone}
-                      onChange={(e) => setDepPhone(e.target.value)} placeholder="0712345678" required />
+                    <label className="form-label">Safaricom Number</label>
+                    <input
+                      className="form-control-shabiki w-100"
+                      value={depPhone}
+                      onChange={(e) => setDepPhone(e.target.value)}
+                      placeholder="0712 345 678"
+                      required
+                    />
                   </div>
+
                   <div className="mb-3">
-                    <label style={{ color: "var(--text-muted)", fontSize: ".75rem", display: "block", marginBottom: 4 }}>
-                      Amount (KES)
-                    </label>
-                    <input className="form-control-shabiki w-100" type="number"
-                      value={depAmount} onChange={(e) => setDepAmount(e.target.value)} min="10" required />
+                    <label className="form-label">Amount (KES)</label>
+                    <input
+                      className="form-control-shabiki w-100"
+                      type="number"
+                      value={depAmount}
+                      onChange={(e) => setDepAmount(e.target.value)}
+                      min="10"
+                      required
+                    />
                   </div>
-                  <button className="btn btn-orange w-100 py-2" type="submit" disabled={loading}
-                    style={{ fontFamily: "var(--font-display)", letterSpacing: 1 }}>
-                    {loading ? <span className="spin"><i className="bi bi-arrow-repeat" /></span> : "DEPOSIT VIA M-PESA"}
+
+                  <button
+                    className="btn btn-orange w-100 btn-lg"
+                    type="submit"
+                    disabled={loading}
+                  >
+                    {loading ? <span className="spin">↻</span> : "DEPOSIT VIA M-PESA"}
                   </button>
-                  <p style={{ color: "var(--text-muted)", fontSize: ".72rem", marginTop: 8, marginBottom: 0 }}>
-                    You'll receive a prompt on your phone. Enter your PIN to confirm.
+                  <p
+                    style={{
+                      color: "var(--text-muted)",
+                      fontSize: ".75rem",
+                      marginTop: 10,
+                    }}
+                  >
+                    A payment prompt will appear on your phone. Enter your M-Pesa PIN to confirm.
                   </p>
                 </form>
               </>
             )}
 
-            {/* Withdraw */}
+            {/* ── WITHDRAW ── */}
             {tab === "withdraw" && (
               <form onSubmit={handleWithdraw}>
-                <div className="d-flex gap-1 mb-3">
+
+                {/* Method selector */}
+                <div className="d-flex mb-3" style={{ gap: 6 }}>
                   {["mpesa", "paypal"].map((m) => (
-                    <button key={m} type="button"
-                      className={wMethod === m ? "btn btn-orange btn-sm flex-grow-1" : "btn btn-ghost btn-sm flex-grow-1"}
+                    <button
+                      key={m}
+                      type="button"
+                      className={`payment-method-tab${wMethod === m ? " active" : ""}`}
                       onClick={() => setWMethod(m)}
-                      style={{ textTransform: "uppercase", fontFamily: "var(--font-display)", fontSize: ".7rem", letterSpacing: 1 }}>
-                      {m}
+                    >
+                      {m === "mpesa" ? "📱 M-Pesa" : "🅿 PayPal"}
                     </button>
                   ))}
                 </div>
 
                 {wMethod === "mpesa" ? (
                   <div className="mb-3">
-                    <label style={{ color: "var(--text-muted)", fontSize: ".75rem", display: "block", marginBottom: 4 }}>Phone</label>
-                    <input className="form-control-shabiki w-100" value={wPhone}
-                      onChange={(e) => setWPhone(e.target.value)} placeholder="0712345678" required />
+                    <label className="form-label">Safaricom Number</label>
+                    <input
+                      className="form-control-shabiki w-100"
+                      value={wPhone}
+                      onChange={(e) => setWPhone(e.target.value)}
+                      placeholder="0712 345 678"
+                      required
+                    />
                   </div>
                 ) : (
                   <div className="mb-3">
-                    <label style={{ color: "var(--text-muted)", fontSize: ".75rem", display: "block", marginBottom: 4 }}>PayPal Email</label>
-                    <input className="form-control-shabiki w-100" type="email" value={wEmail}
-                      onChange={(e) => setWEmail(e.target.value)} placeholder="you@example.com" required />
+                    <label className="form-label">PayPal Email</label>
+                    <input
+                      className="form-control-shabiki w-100"
+                      type="email"
+                      value={wEmail}
+                      onChange={(e) => setWEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      required
+                    />
                   </div>
                 )}
 
                 <div className="mb-3">
-                  <label style={{ color: "var(--text-muted)", fontSize: ".75rem", display: "block", marginBottom: 4 }}>Amount (KES)</label>
-                  <input className="form-control-shabiki w-100" type="number"
-                    value={wAmount} onChange={(e) => setWAmount(e.target.value)} min="10" required />
+                  <label className="form-label">Amount (KES)</label>
+                  <input
+                    className="form-control-shabiki w-100"
+                    type="number"
+                    value={wAmount}
+                    onChange={(e) => setWAmount(e.target.value)}
+                    min="10"
+                    required
+                  />
                 </div>
-                <button className="btn btn-cyan w-100 py-2" type="submit" disabled={loading}
-                  style={{ fontFamily: "var(--font-display)", letterSpacing: 1 }}>
-                  {loading ? <span className="spin"><i className="bi bi-arrow-repeat" /></span> : `WITHDRAW VIA ${wMethod.toUpperCase()}`}
+
+                <button
+                  className="btn btn-cyan w-100 btn-lg"
+                  type="submit"
+                  disabled={loading}
+                >
+                  {loading
+                    ? <span className="spin">↻</span>
+                    : `WITHDRAW VIA ${wMethod.toUpperCase()}`}
                 </button>
               </form>
             )}
           </div>
         </div>
 
-        {/* Transaction history */}
+        {/* ── Transaction history ── */}
         <div className="col-12 col-md-6">
           <div className="card-shabiki p-3">
-            <div style={{ fontFamily: "var(--font-display)", fontSize: ".75rem", color: "var(--text-muted)", letterSpacing: 1, marginBottom: 12 }}>
+            <div
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: ".62rem",
+                letterSpacing: ".14em",
+                color: "var(--text-muted)",
+                marginBottom: 14,
+              }}
+            >
               RECENT TRANSACTIONS
             </div>
+
             {txs.length === 0 ? (
-              <div style={{ color: "var(--text-dim)", textAlign: "center", padding: "30px 0", fontSize: ".85rem" }}>
+              <div
+                style={{
+                  color: "var(--text-dim)",
+                  textAlign: "center",
+                  padding: "36px 0",
+                  fontSize: ".88rem",
+                }}
+              >
                 No transactions yet
               </div>
             ) : (
-              <div style={{ maxHeight: 400, overflowY: "auto" }}>
+              <div style={{ maxHeight: 420, overflowY: "auto" }}>
                 {txs.map((tx) => (
-                  <div key={tx.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
+                  <div key={tx.id} className="tx-row">
                     <div>
-                      <div style={{ fontSize: ".82rem", textTransform: "capitalize", color: "var(--text-primary)" }}>
-                        {tx.type}
-                        <span style={{ color: "var(--text-muted)", marginLeft: 6, fontSize: ".72rem" }}>via {tx.method}</span>
+                      <div>
+                        <span className="tx-type">{tx.type}</span>
+                        <span className="tx-method">via {tx.method}</span>
                       </div>
-                      <div style={{ color: "var(--text-muted)", fontSize: ".7rem" }}>
-                        {new Date(tx.created_at).toLocaleString()}
+                      <div className="tx-date">
+                        {new Date(tx.created_at).toLocaleString("en-KE", {
+                          dateStyle: "short",
+                          timeStyle: "short",
+                        })}
                       </div>
                     </div>
                     <div style={{ textAlign: "right" }}>
-                      <div style={{
-                        fontWeight: 700,
-                        color: tx.type === "deposit" || tx.type === "win" ? "var(--green)" : "var(--red)"
-                      }}>
-                        {tx.type === "deposit" || tx.type === "win" ? "+" : "-"}KES {parseFloat(tx.amount).toLocaleString()}
+                      <div className={`tx-amount ${txColor(tx.type)}`}>
+                        {txSign(tx.type)}KES {parseFloat(tx.amount).toLocaleString()}
                       </div>
                       <span className={`badge-status badge-${tx.status}`}>{tx.status}</span>
                     </div>

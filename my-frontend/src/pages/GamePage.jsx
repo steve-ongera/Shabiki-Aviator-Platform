@@ -1,68 +1,62 @@
+// pages/GamePage.jsx
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { WS_URL } from "../utils/api";
 import { useAuth, useFlash } from "../App";
-import PlaneAnimation from "../components/PlaneAnimation";
-import BetPanel       from "../components/BetPanel";
-import PlayersList    from "../components/PlayersList";
-import LiveChat       from "../components/LiveChat";
-import api            from "../utils/api";
+import PlaneAnimation    from "../components/PlaneAnimation";
+import BetPanel          from "../components/BetPanel";
+import MultiplierDisplay from "../components/MultiplierDisplay";
+import PlayersList       from "../components/PlayersList";
+import LiveChat          from "../components/LiveChat";
+import api               from "../utils/api";
 
-const MAX_HISTORY = 20;
+const MAX_HISTORY  = 20;
 const MAX_LIVE_FEED = 50;
 
+// crash value → chip CSS class
+const chipClass = (v) => {
+  const n = parseFloat(v);
+  if (n < 2)   return "history-chip chip-low";
+  if (n < 10)  return "history-chip chip-mid";
+  if (n < 100) return "history-chip chip-high";
+  return "history-chip chip-moon";
+};
+
 export default function GamePage() {
-  const { user } = useAuth();
+  const { user }  = useAuth();
   const { flash } = useFlash();
-  const socketRef = useRef(null);
+  const socketRef  = useRef(null);
 
-  const [status,      setStatus]      = useState("waiting");
-  const [multiplier,  setMultiplier]  = useState("1.00");
-  const [roundId,     setRoundId]     = useState(null);
-  const [crashPoint,  setCrashPoint]  = useState(null);
-  const [players,     setPlayers]     = useState([]);
-  const [hasBet,      setHasBet]      = useState(false);
-  const [history,     setHistory]     = useState([]);   // past round crash points
-  const [chatMessages,setChatMessages] = useState([]);
-  const [liveFeed,    setLiveFeed]    = useState([]);
-  const [connected,   setConnected]   = useState(false);
+  const [status,       setStatus]       = useState("waiting");
+  const [multiplier,   setMultiplier]   = useState(1.0);
+  const [roundId,      setRoundId]      = useState(null);
+  const [crashPoint,   setCrashPoint]   = useState(null);
+  const [players,      setPlayers]      = useState([]);
+  const [hasBet,       setHasBet]       = useState(false);
+  const [history,      setHistory]      = useState([]);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [liveFeed,     setLiveFeed]     = useState([]);
+  const [connected,    setConnected]    = useState(false);
 
-  // ── History chips ──────────────────────────────────────────────────────────
-  const chipClass = (v) => {
-    const n = parseFloat(v);
-    if (n < 2)   return "chip-low";
-    if (n < 10)  return "chip-mid";
-    if (n < 100) return "chip-high";
-    return "chip-moon";
-  };
-
-  // ── WebSocket ──────────────────────────────────────────────────────────────
+  // ── WebSocket ──────────────────────────────────────────────
   const connect = useCallback(() => {
     const token = localStorage.getItem("access_token");
-    const url   = `${WS_URL}/game/?token=${token}`;
-    const ws    = new WebSocket(url);
+    const ws    = new WebSocket(`${WS_URL}/game/?token=${token}`);
     socketRef.current = ws;
 
     ws.onopen  = () => setConnected(true);
-    ws.onclose = () => {
-      setConnected(false);
-      setTimeout(connect, 3000); // auto-reconnect
-    };
+    ws.onclose = () => { setConnected(false); setTimeout(connect, 3000); };
     ws.onerror = () => ws.close();
-
     ws.onmessage = (evt) => {
-      try {
-        const msg = JSON.parse(evt.data);
-        handleWsMessage(msg);
-      } catch {}
+      try { handleWsMessage(JSON.parse(evt.data)); } catch {}
     };
-  }, []);
+  }, []); // eslint-disable-line
 
   const handleWsMessage = useCallback((msg) => {
     switch (msg.type) {
       case "game.state":
       case "game.betting":
         setStatus(msg.status || "betting");
-        setMultiplier(msg.multiplier || "1.00");
+        setMultiplier(parseFloat(msg.multiplier) || 1.0);
         if (msg.round_id) setRoundId(msg.round_id);
         if (msg.players)  setPlayers(msg.players);
         if (msg.status === "betting" || msg.status === "waiting") {
@@ -73,15 +67,17 @@ export default function GamePage() {
 
       case "game.tick":
         setStatus("flying");
-        setMultiplier(msg.multiplier);
+        setMultiplier(parseFloat(msg.multiplier));
         break;
 
       case "game.crash":
         setStatus("crashed");
-        setCrashPoint(msg.crash_point);
-        setMultiplier(msg.crash_point);
+        setCrashPoint(parseFloat(msg.crash_point));
+        setMultiplier(parseFloat(msg.crash_point));
         setHistory((h) => [msg.crash_point, ...h].slice(0, MAX_HISTORY));
-        setPlayers((p) => p.map((pl) => pl.status === "placed" ? { ...pl, status: "lost" } : pl));
+        setPlayers((p) =>
+          p.map((pl) => pl.status === "placed" ? { ...pl, status: "lost" } : pl)
+        );
         break;
 
       case "players.update":
@@ -127,68 +123,96 @@ export default function GamePage() {
 
   // Load recent history on mount
   useEffect(() => {
-    api.get("/game/rounds/").then((r) => {
-      setHistory(r.data.map((rnd) => rnd.crash_point).filter(Boolean));
-    }).catch(() => {});
+    api.get("/game/rounds/")
+      .then((r) => setHistory(r.data.map((rnd) => rnd.crash_point).filter(Boolean)))
+      .catch(() => {});
   }, []);
 
   return (
-    <div style={{ padding: "12px", maxWidth: 1280, margin: "0 auto" }}>
-      {/* Connection indicator */}
+    <div className="container-shabiki" style={{ padding: "12px 16px" }}>
+
+      {/* ── Reconnecting banner ── */}
       {!connected && (
-        <div style={{ background: "#450a0a", border: "1px solid var(--red)", borderRadius: 8, padding: "8px 16px", marginBottom: 10, fontSize: ".82rem", color: "#fca5a5" }}>
-          <span className="spin me-2"><i className="bi bi-arrow-repeat" /></span>
-          Reconnecting to game server...
+        <div className="reconnect-bar">
+          <span className="spin">↻</span>
+          Reconnecting to game server…
         </div>
       )}
 
-      {/* History row */}
-      <div className="mb-2" style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
-        <span style={{ color: "var(--text-muted)", fontSize: ".7rem", marginRight: 4 }}>HISTORY</span>
+      {/* ── History chips ── */}
+      <div
+        className="d-flex align-items-center mb-2 history-row"
+        style={{ gap: 6, paddingBottom: 2 }}
+      >
+        <span
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: ".58rem",
+            letterSpacing: ".14em",
+            color: "var(--text-dim)",
+            flexShrink: 0,
+          }}
+        >
+          HISTORY
+        </span>
         {history.map((cp, i) => (
-          <span key={i} className={`history-chip ${chipClass(cp)}`}>
+          <span key={i} className={chipClass(cp)}>
             {parseFloat(cp).toFixed(2)}×
           </span>
         ))}
       </div>
 
-      {/* Main grid */}
-      <div className="row g-2">
-        {/* Left: canvas + bet panel */}
-        <div className="col-12 col-lg-8">
-          <PlaneAnimation
-            status={status}
-            multiplier={multiplier}
-            crashPoint={crashPoint}
-          />
+      {/* ── Main grid ── */}
+      <div className="row g-2 game-main-grid">
 
-          {/* Multiplier display below canvas */}
-          <div className="d-flex align-items-center justify-content-between my-2 px-1">
-            <div>
-              <span
-                className={`multiplier-value ${
-                  status === "flying"  ? "multiplier-flying"  :
-                  status === "crashed" ? "multiplier-crashed" :
-                  status === "betting" ? "multiplier-betting" :
-                  "multiplier-waiting"
-                }`}
-                style={{ fontSize: "2.8rem" }}
+        {/* Left column — canvas + multiplier + bet panel */}
+        <div className="col-12 col-lg-8" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+
+          {/* Plane canvas */}
+          <div className="plane-canvas-wrap">
+            <PlaneAnimation
+              status={status}
+              multiplier={multiplier}
+              crashPoint={crashPoint}
+            />
+          </div>
+
+          {/* Multiplier + round ID row */}
+          <div
+            className="d-flex align-items-center justify-content-between"
+            style={{ padding: "0 4px" }}
+          >
+            <MultiplierDisplay
+              multiplier={multiplier}
+              phase={status}
+              crashPoint={crashPoint}
+            />
+
+            <div style={{ textAlign: "right", flexShrink: 0 }}>
+              <div
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontSize: ".58rem",
+                  letterSpacing: ".14em",
+                  color: "var(--text-dim)",
+                }}
               >
-                {status === "flying" || status === "crashed"
-                  ? `${parseFloat(multiplier).toFixed(2)}×`
-                  : status === "betting"
-                  ? "BETTING..."
-                  : "WAITING..."}
-              </span>
-            </div>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ color: "var(--text-muted)", fontSize: ".7rem" }}>ROUND</div>
-              <div style={{ fontFamily: "var(--font-display)", fontSize: ".75rem", color: "var(--accent2)" }}>
-                {roundId ? `#${roundId.slice(0, 8).toUpperCase()}` : "—"}
+                ROUND
+              </div>
+              <div
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontSize: ".72rem",
+                  color: "var(--accent2)",
+                  marginTop: 3,
+                }}
+              >
+                {roundId ? `#${roundId.toString().slice(0, 8).toUpperCase()}` : "—"}
               </div>
             </div>
           </div>
 
+          {/* Bet panel */}
           <BetPanel
             status={status}
             roundId={roundId}
@@ -199,10 +223,32 @@ export default function GamePage() {
           />
         </div>
 
-        {/* Right: players + chat */}
-        <div className="col-12 col-lg-4 d-flex flex-column gap-2">
-          <PlayersList players={players} />
-          <div style={{ flex: 1, minHeight: 380 }}>
+        {/* Right column — players + chat */}
+        <div
+          className="col-12 col-lg-4"
+          style={{ display: "flex", flexDirection: "column", gap: 10 }}
+        >
+          <div className="card-shabiki">
+            <div
+              style={{
+                padding: "10px 14px",
+                borderBottom: "1px solid var(--border)",
+                fontFamily: "var(--font-display)",
+                fontSize: ".62rem",
+                letterSpacing: ".12em",
+                color: "var(--text-muted)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <span>PLAYERS THIS ROUND</span>
+              <span style={{ color: "var(--accent2)" }}>{players.length}</span>
+            </div>
+            <PlayersList players={players} />
+          </div>
+
+          <div style={{ flex: 1, minHeight: 320 }}>
             <LiveChat
               socket={socketRef.current}
               chatMessages={chatMessages}
