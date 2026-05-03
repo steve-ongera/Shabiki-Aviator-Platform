@@ -40,7 +40,7 @@ def send_payout(email: str, amount_kes: float, sender_item_id: str) -> dict:
     payload = {
         "sender_batch_header": {
             "sender_batch_id": sender_item_id,
-            "email_subject": "Shabiki Aviator — Your withdrawal",
+            "email_subject": "backend Aviator — Your withdrawal",
         },
         "items": [
             {
@@ -48,7 +48,7 @@ def send_payout(email: str, amount_kes: float, sender_item_id: str) -> dict:
                 "amount": {"value": str(usd_amount), "currency": "USD"},
                 "receiver": email,
                 "sender_item_id": sender_item_id,
-                "note": "Shabiki withdrawal",
+                "note": "backend withdrawal",
             }
         ],
     }

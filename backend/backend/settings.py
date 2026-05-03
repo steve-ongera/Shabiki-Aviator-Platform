@@ -1,5 +1,5 @@
 """
-Shabiki Aviator Platform — Django Settings
+backend Aviator Platform — Django Settings
 """
 import os
 from pathlib import Path
@@ -42,7 +42,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ROOT_URLCONF = "shabiki.urls"
+ROOT_URLCONF = "backend.urls"
 
 TEMPLATES = [
     {
@@ -60,8 +60,8 @@ TEMPLATES = [
     }
 ]
 
-WSGI_APPLICATION = "shabiki.wsgi.application"
-ASGI_APPLICATION = "shabiki.asgi.application"
+WSGI_APPLICATION = "backend.wsgi.application"
+ASGI_APPLICATION = "backend.asgi.application"
 
 # ── Database ──────────────────────────────────────────────────────────────────
 DATABASES = {
